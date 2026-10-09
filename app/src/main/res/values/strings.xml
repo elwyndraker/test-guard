@@ -45,8 +45,8 @@
     <string name="blocklist_credit">Blocklist: StevenBlack/hosts (MIT license)</string>
     <string name="close">Close</string>
     <string name="version">Version %1$s</string>
-    <!-- TODO: replace with your GitHub Pages address before uploading to Play -->
-    <string name="privacy_policy_url" translatable="false">https://YOUR-GITHUB-USERNAME.github.io/privacyguard/</string>
+    <!-- Served by GitHub Pages from docs/index.html -->
+    <string name="privacy_policy_url" translatable="false">https://elwyndraker.github.io/test-guard/</string>
     <string name="blocklist_url" translatable="false">https://github.com/StevenBlack/hosts</string>
 
     <!-- Notification -->

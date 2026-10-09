@@ -10,6 +10,10 @@ An Android app that blocks ad and tracker domains on the whole phone, using a lo
 
 Screenshots are from an Android 17 emulator after browsing cnn.com with protection on.
 
+## Download
+
+**[Download the latest APK](https://github.com/elwyndraker/test-guard/releases/latest)**: open this link on your Android phone, tap `PrivacyGuard-v….apk` under **Assets**, then open the downloaded file to install. See [Install the app without Android Studio](#install-the-app-without-android-studio) for details.
+
 ## Contents
 
 - [Features](#features)
@@ -72,7 +76,7 @@ Key design choices:
 
 You don't need USB debugging or Developer options to try the app:
 
-1. Build the APK (see below), or download `app-debug.apk` from the repo's Releases page if one has been published.
+1. Download the APK from the [latest release](https://github.com/elwyndraker/test-guard/releases/latest), or build it yourself (see below).
 2. Copy the `.apk` file to the phone (USB file transfer, Google Drive, Telegram "Saved messages", email, …).
 3. Open the file on the phone with its file manager and tap **Install**. Android asks you to allow "Install unknown apps" for that file manager once; allow it.
 4. Open PrivacyGuard and turn the switch on.
@@ -100,6 +104,19 @@ Requirements:
 ./gradlew testDebugUnitTest      # runs the unit tests
 ./gradlew lintDebug              # runs Android Lint
 ```
+
+### Release builds and signing
+
+`./gradlew assembleRelease` (APK) and `./gradlew bundleRelease` (AAB for Google Play) sign the app when a `keystore.properties` file exists in the project root:
+
+```properties
+storeFile=D:/PrivacyGuard-signing/privacyguard-upload.jks
+storePassword=...
+keyAlias=privacyguard
+keyPassword=...
+```
+
+The file and the key are excluded by `.gitignore` and must never be committed. Without the file, release builds are produced unsigned. Every published release must be signed with the same key, otherwise phones refuse to install it over the previous version.
 
 If Gradle can't find the Android SDK, create `local.properties` with your SDK path (Android Studio does this for you):
 
@@ -215,8 +232,8 @@ Things that look odd but are deliberate:
 
 Before the first upload:
 
-1. Replace `YOUR-GITHUB-USERNAME` in `app/src/main/res/values/strings.xml` (`privacy_policy_url`) with the real GitHub Pages address of `docs/index.html`, and fill in its two placeholders.
-2. Create a signing key: **Build → Generate Signed App Bundle or APK**. Back up the `.jks` file and passwords. Never commit them; `.gitignore` already excludes them.
+1. The privacy policy is live at <https://elwyndraker.github.io/test-guard/> (GitHub Pages, from `docs/index.html`); the app links to it from the Filters screen.
+2. Build the bundle with `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`, signed with the key described in [Release builds and signing](#release-builds-and-signing). Use that key as the Play upload key and keep it backed up.
 3. Raise `versionCode` in `app/build.gradle.kts` before every upload.
 
 Play Console answers (data safety, VpnService declaration, store listing) are in the project plan document.
