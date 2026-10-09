@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrivacyGuard Privacy Policy</title>
+<style>
+  :root { --bg: #ffffff; --text: #1f2328; --muted: #59636e; --rule: #d1d9e0; --link: #0969da; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d1117; --text: #e6edf3; --muted: #9198a1; --rule: #30363d; --link: #4493f8; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  .date { color: var(--muted); margin: 0 0 24px; }
+  a { color: var(--link); }
+  li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PrivacyGuard Privacy Policy</h1>
+  <p class="date">Effective date: &lt;date you publish&gt;</p>
+
+  <p>PrivacyGuard is a free Android app that blocks known tracking and advertising domains on your phone. This policy explains what happens to your data.</p>
+
+  <h2>Summary</h2>
+  <p>PrivacyGuard does not collect, store, sell or share any personal data. There is no account and no server run by us.</p>
+
+  <h2>How the app handles your data</h2>
+  <ul>
+    <li><strong>Website lookups (DNS).</strong> When protection is on, PrivacyGuard uses Android's VpnService to create a local VPN on your phone. Only DNS lookups (the names of websites and services your apps contact) pass through it. Each name is checked against a blocklist on your phone. Blocked names are answered on the phone. Other lookups are forwarded unchanged to your network's normal DNS server, as your phone would do without the app. If that server cannot be found or does not respond, the lookup is sent to Cloudflare's public DNS (1.1.1.1), which handles it under <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's own privacy policy</a>.</li>
+    <li><strong>Page content.</strong> Web pages, videos and other traffic do not pass through PrivacyGuard.</li>
+    <li><strong>Blocked-requests list.</strong> The list of blocked names is kept in the phone's memory only, never saved to a server, and is cleared when the app is closed.</li>
+    <li><strong>Blocklist updates.</strong> The app downloads the public <a href="https://github.com/StevenBlack/hosts">StevenBlack hosts list</a> from GitHub (raw.githubusercontent.com). Like any download, GitHub receives your IP address for that request.</li>
+    <li><strong>Settings.</strong> Whether protection is on and when the list was last updated are stored on your phone only.</li>
+  </ul>
+
+  <h2>What we do not do</h2>
+  <p>No analytics, no advertising, no tracking, no crash-reporting SDKs, no remote VPN server. PrivacyGuard does not change your IP address or encrypt your traffic.</p>
+
+  <h2>Permissions</h2>
+  <ul>
+    <li><strong>VPN (VpnService):</strong> to receive DNS lookups on the device.</li>
+    <li><strong>Internet and network state:</strong> to forward allowed lookups and download the blocklist.</li>
+    <li><strong>Notifications and foreground service:</strong> to show that protection is running.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>PrivacyGuard is not directed at children under 13.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the new version will be posted on this page with a new effective date.</p>
+
+  <h2>Contact</h2>
+  <p>&lt;your contact email&gt;</p>
+</main>
+</body>
+</html>

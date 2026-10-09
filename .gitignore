@@ -1,0 +1,15 @@
+.gradle/
+.kotlin/
+build/
+/local.properties
+/captures
+.externalNativeBuild/
+.cxx/
+.idea/
+*.iml
+.DS_Store
+
+# Signing secrets: never commit these
+*.jks
+*.keystore
+keystore.properties
