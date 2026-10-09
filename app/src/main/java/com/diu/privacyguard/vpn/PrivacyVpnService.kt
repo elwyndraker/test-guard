@@ -33,10 +33,8 @@ import kotlinx.coroutines.launch
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 /**
@@ -52,8 +50,12 @@ class PrivacyVpnService : VpnService() {
         private const val NOTIFICATION_ID = 1
         private const val TUNNEL_ADDRESS = "10.111.222.1"
         private const val FAKE_DNS = "10.111.222.2"
-        private const val DNS_TIMEOUT_MS = 5_000
-        private val FALLBACK_DNS: InetAddress = InetAddress.getByAddress(byteArrayOf(1, 1, 1, 1))
+        private const val STOPPED_NOTIFICATION_ID = 2
+
+        // Safety switch: if every lookup fails for this long while a network is connected,
+        // turn protection off so the phone's internet keeps working.
+        private const val GIVE_UP_AFTER_MS = 20_000L
+        private const val GIVE_UP_MIN_FAILURES = 10
     }
 
     /** One open tunnel. Its own flag means an old loop can never keep running on a new tunnel. */
@@ -70,14 +72,26 @@ class PrivacyVpnService : VpnService() {
     private var generation = 0
     private var callbackRegistered = false
 
-    // The real DNS server of the current Wi-Fi or mobile network. Our app is excluded from the
-    // VPN, so this callback always sees the real network.
-    @Volatile
-    private var upstream: InetAddress = FALLBACK_DNS
+    private val upstream = UpstreamDns(::protect)
+    private val consecutiveFailures = AtomicInteger(0)
 
+    @Volatile
+    private var failingSince = 0L
+
+    // Follows the real Wi-Fi or mobile network. Our app is excluded from the VPN, so its
+    // default network is always the real one, never our tunnel.
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            upstream.network = network
+        }
+
         override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
-            linkProperties.dnsServers.firstOrNull()?.let { upstream = it }
+            upstream.network = network
+            upstream.servers = linkProperties.dnsServers
+        }
+
+        override fun onLost(network: Network) {
+            if (upstream.network == network) upstream.network = null
         }
     }
 
@@ -142,8 +156,12 @@ class PrivacyVpnService : VpnService() {
             Blocklist.load(applicationContext)
 
             val connectivity = getSystemService(ConnectivityManager::class.java)
-            upstream = connectivity.getLinkProperties(connectivity.activeNetwork)
-                ?.dnsServers?.firstOrNull() ?: FALLBACK_DNS
+            val realNetwork = connectivity.activeNetwork
+            upstream.network = realNetwork
+            upstream.servers = connectivity.getLinkProperties(realNetwork)?.dnsServers.orEmpty()
+            VpnController.resetStats()
+            consecutiveFailures.set(0)
+            failingSince = 0L
 
             val fd = try {
                 Builder()
@@ -177,7 +195,7 @@ class PrivacyVpnService : VpnService() {
                 connectivity.registerDefaultNetworkCallback(networkCallback)
                 callbackRegistered = true
                 thread(name = "PrivacyGuard-tunnel") { runLoop(newTunnel) }
-                Log.i(TAG, "Tunnel open, upstream DNS $upstream, ${Blocklist.size.value} domains")
+                Log.i(TAG, "Tunnel open, network DNS ${upstream.servers}, ${Blocklist.size.value} domains")
             }
         }
     }
@@ -228,28 +246,57 @@ class PrivacyVpnService : VpnService() {
         } else {
             // Each lookup gets its own coroutine so one slow site doesn't hold up the others.
             scope.launch {
-                val server = upstream
-                val answer = forward(server, query.dns)
-                    ?: if (server != FALLBACK_DNS) forward(FALLBACK_DNS, query.dns) else null
-                if (answer != null) {
+                val result = upstream.resolve(query.dns)
+                if (result != null) {
+                    val (answer, route) = result
                     write(output, PacketUtils.buildResponse(packet, query.ipHeaderLength, answer))
+                    VpnController.recordAnswer(route)
+                    consecutiveFailures.set(0)
+                    failingSince = 0L
+                } else {
+                    Log.w(TAG, "No DNS answer for ${query.domain}")
+                    VpnController.recordFailure()
+                    onLookupFailed()
                 }
             }
         }
     }
 
-    private fun forward(server: InetAddress, dns: ByteArray): ByteArray? = try {
-        DatagramSocket().use { socket ->
-            protect(socket)
-            socket.soTimeout = DNS_TIMEOUT_MS
-            socket.send(DatagramPacket(dns, dns.size, server, 53))
-            val buffer = ByteArray(4096)
-            val reply = DatagramPacket(buffer, buffer.size)
-            socket.receive(reply)
-            buffer.copyOf(reply.length)
+    private fun onLookupFailed() {
+        val now = System.currentTimeMillis()
+        if (consecutiveFailures.incrementAndGet() == 1) failingSince = now
+        val since = failingSince
+        val hasNetwork = upstream.network != null
+        if (hasNetwork && consecutiveFailures.get() >= GIVE_UP_MIN_FAILURES &&
+            since != 0L && now - since >= GIVE_UP_AFTER_MS
+        ) {
+            mainHandler.post { giveUp() }
         }
-    } catch (e: IOException) {
-        null
+    }
+
+    /** Lookups keep failing: stop, so the phone's internet keeps working, and say why. */
+    private fun giveUp() {
+        if (tunnel == null) return
+        Log.e(TAG, "Lookups failing for ${GIVE_UP_AFTER_MS / 1000}s, turning protection off")
+        val reason = getString(R.string.stopped_dns_failing)
+        VpnController.setStopReason(reason)
+        shutdown()
+        val openApp = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_shield)
+            .setContentTitle(getString(R.string.stopped_title))
+            .setContentText(reason)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(reason))
+            .setContentIntent(openApp)
+            .setAutoCancel(true)
+            .build()
+        try {
+            getSystemService(NotificationManager::class.java).notify(STOPPED_NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            // Notifications not allowed; the Home screen still shows the reason.
+        }
     }
 
     private fun write(output: FileOutputStream, packet: ByteArray) {

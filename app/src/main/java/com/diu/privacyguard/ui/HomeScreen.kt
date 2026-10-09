@@ -59,6 +59,8 @@ fun HomeScreen() {
     val scope = rememberCoroutineScope()
     val running by VpnController.isRunning.collectAsStateWithLifecycle()
     val blockedToday by BlockedLog.todayCount.collectAsStateWithLifecycle()
+    val stats by VpnController.stats.collectAsStateWithLifecycle()
+    val stopReason by VpnController.stopReason.collectAsStateWithLifecycle()
     val disclosureAccepted by Settings.disclosureAccepted(context)
         .collectAsStateWithLifecycle(initialValue = false)
     var showDisclosure by remember { mutableStateOf(false) }
@@ -163,6 +165,20 @@ fun HomeScreen() {
                 .semantics { contentDescription = switchLabel },
         )
 
+        stopReason?.takeIf { !running }?.let { reason ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+            ) {
+                Text(
+                    text = reason,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+        }
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -181,6 +197,24 @@ fun HomeScreen() {
                     text = stringResource(R.string.blocked_today),
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
+            }
+        }
+
+        // Diagnostics: lets a tester report exactly what is happening.
+        if (running) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = stringResource(R.string.stats_line, stats.answered, stats.failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (stats.route.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.stats_route, stats.route),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
