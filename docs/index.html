@@ -22,7 +22,7 @@
 <body>
 <main>
   <h1>PrivacyGuard Privacy Policy</h1>
-  <p class="date">Effective date: October 10, 2026</p>
+  <p class="date">Effective date: October 10, 2026 (updated for version 1.2)</p>
 
   <p>PrivacyGuard is a free Android app that blocks known tracking and advertising domains on your phone. This policy explains what happens to your data.</p>
 
@@ -31,7 +31,7 @@
 
   <h2>How the app handles your data</h2>
   <ul>
-    <li><strong>Website lookups (DNS).</strong> When protection is on, PrivacyGuard uses Android's VpnService to create a local VPN on your phone. Only DNS lookups (the names of websites and services your apps contact) pass through it. Each name is checked against a blocklist on your phone. Blocked names are answered on the phone. Other lookups are forwarded unchanged to your network's normal DNS server, as your phone would do without the app. If that server cannot be found or does not respond, the lookup is sent to Cloudflare's public DNS (1.1.1.1), which handles it under <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's own privacy policy</a>.</li>
+    <li><strong>Website lookups (DNS).</strong> When protection is on, PrivacyGuard uses Android's VpnService to create a local VPN on your phone. Only DNS lookups (the names of websites and services your apps contact) pass through it. Each name is checked against a blocklist on your phone. Blocked names are answered on the phone. Other lookups are forwarded unchanged to your network's normal DNS server, as your phone would do without the app. If that server cannot be found or does not respond quickly, the lookup is also sent to a public DNS service, Cloudflare (1.1.1.1) or Google (8.8.8.8), which handles it under its own privacy policy (<a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>, <a href="https://developers.google.com/speed/public-dns/privacy">Google</a>).</li>
     <li><strong>Page content.</strong> Web pages, videos and other traffic do not pass through PrivacyGuard.</li>
     <li><strong>Blocked-requests list.</strong> The list of blocked names is kept in the phone's memory only, never saved to a server, and is cleared when the app is closed.</li>
     <li><strong>Blocklist updates.</strong> The app downloads the public <a href="https://github.com/StevenBlack/hosts">StevenBlack hosts list</a> from GitHub (raw.githubusercontent.com). Like any download, GitHub receives your IP address for that request.</li>

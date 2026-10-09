@@ -40,7 +40,7 @@
     <string name="update_failed">Update failed: %1$s</string>
     <string name="auto_update_note">The list also updates automatically when it is older than 7 days.</string>
     <string name="about">About and privacy</string>
-    <string name="about_text">PrivacyGuard filters website lookups on your phone. It collects no personal data, has no account and no server. Blocked lookups never leave the phone; other lookups go to your network\'s normal DNS server (or Cloudflare 1.1.1.1 if that server does not answer).</string>
+    <string name="about_text">PrivacyGuard filters website lookups on your phone. It collects no personal data, has no account and no server. Blocked lookups never leave the phone; other lookups go to your network\'s normal DNS server (or to Cloudflare 1.1.1.1 / Google 8.8.8.8 if that server does not answer quickly).</string>
     <string name="privacy_policy">Read the privacy policy</string>
     <string name="blocklist_credit">Blocklist: StevenBlack/hosts (MIT license)</string>
     <string name="close">Close</string>
@@ -52,6 +52,10 @@
     <!-- Diagnostics and the safety switch -->
     <string name="stats_line">Lookups answered: %1$d · failed: %2$d</string>
     <string name="stats_route">DNS via: %1$s</string>
+    <string name="stats_network">Network: %1$s</string>
+    <string name="last_problem">Last problem: %1$s</string>
+    <string name="copy_details">Copy details for a bug report</string>
+    <string name="details_copied">Details copied. Paste them in your message.</string>
     <string name="stopped_title">PrivacyGuard turned itself off</string>
     <string name="stopped_dns_failing">Website lookups kept failing, so protection was turned off to keep your internet working. Check your connection and turn it on again. If this keeps happening, please report it with your phone model.</string>
 

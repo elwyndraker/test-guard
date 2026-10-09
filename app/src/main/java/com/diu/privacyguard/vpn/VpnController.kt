@@ -11,6 +11,9 @@ data class VpnStats(
     val answered: Int = 0,
     val failed: Int = 0,
     val route: String = "",
+    val networkType: String = "",
+    val networkDns: String = "",
+    val lastError: String = "",
 )
 
 /** Starts and stops the VPN. The switch on screen follows [isRunning], which only the service sets. */
@@ -38,8 +41,12 @@ object VpnController {
         _stats.update { it.copy(answered = it.answered + 1, route = route) }
     }
 
-    internal fun recordFailure() {
-        _stats.update { it.copy(failed = it.failed + 1) }
+    internal fun recordFailure(error: String) {
+        _stats.update { it.copy(failed = it.failed + 1, lastError = error) }
+    }
+
+    internal fun setNetwork(type: String, dns: String) {
+        _stats.update { it.copy(networkType = type, networkDns = dns) }
     }
 
     internal fun setStopReason(reason: String?) {

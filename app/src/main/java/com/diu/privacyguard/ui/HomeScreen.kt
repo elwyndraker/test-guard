@@ -3,11 +3,15 @@ package com.diu.privacyguard.ui
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.provider.Settings as AndroidSettings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -47,11 +51,36 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.diu.privacyguard.BuildConfigInfo
 import com.diu.privacyguard.R
 import com.diu.privacyguard.data.BlockedLog
 import com.diu.privacyguard.data.Settings
 import com.diu.privacyguard.vpn.VpnController
+import com.diu.privacyguard.vpn.VpnStats
 import kotlinx.coroutines.launch
+
+@Composable
+private fun DiagnosticLine(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+}
+
+/** Plain-text summary a tester can paste into a bug report. */
+private fun diagnosticsReport(context: Context, running: Boolean, stats: VpnStats, stopReason: String?) =
+    buildString {
+        appendLine("PrivacyGuard ${BuildConfigInfo.versionName(context)}")
+        appendLine("Phone: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+        appendLine("Protection: ${if (running) "on" else "off"}")
+        appendLine("Network: ${stats.networkType}; ${stats.networkDns}")
+        appendLine("Lookups answered: ${stats.answered}, failed: ${stats.failed}")
+        appendLine("DNS via: ${stats.route.ifEmpty { "-" }}")
+        appendLine("Last problem: ${stats.lastError.ifEmpty { "-" }}")
+        if (stopReason != null) appendLine("Stopped automatically: yes")
+    }
 
 @Composable
 fun HomeScreen() {
@@ -201,20 +230,23 @@ fun HomeScreen() {
         }
 
         // Diagnostics: lets a tester report exactly what is happening.
-        if (running) {
+        if (running || stopReason != null) {
+            val copiedText = stringResource(R.string.details_copied)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = stringResource(R.string.stats_line, stats.answered, stats.failed),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (stats.route.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.stats_route, stats.route),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                DiagnosticLine(stringResource(R.string.stats_line, stats.answered, stats.failed))
+                if (stats.route.isNotEmpty()) DiagnosticLine(stringResource(R.string.stats_route, stats.route))
+                if (stats.networkType.isNotEmpty()) {
+                    DiagnosticLine(stringResource(R.string.stats_network, stats.networkType))
                 }
+                if (stats.lastError.isNotEmpty()) {
+                    DiagnosticLine(stringResource(R.string.last_problem, stats.lastError))
+                }
+                TextButton(onClick = {
+                    val details = diagnosticsReport(context, running, stats, stopReason)
+                    context.getSystemService(ClipboardManager::class.java)
+                        .setPrimaryClip(ClipData.newPlainText("PrivacyGuard details", details))
+                    Toast.makeText(context, copiedText, Toast.LENGTH_SHORT).show()
+                }) { Text(stringResource(R.string.copy_details)) }
             }
         }
 

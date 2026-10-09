@@ -37,10 +37,10 @@ Screenshots are from an Android 17 emulator after browsing cnn.com with protecti
 | Live list of blocked domains, newest first; repeats are grouped ("Blocked 4 times") | **Blocked** screen |
 | Blocklist update on demand, and automatically when older than 7 days | **Filters** screen |
 | Works offline on first launch (a copy of the list ships inside the app) | `app/src/main/assets/hosts.txt` |
-| Follows Wi-Fi ↔ mobile data changes | `PrivacyVpnService.networkCallback` |
+| Follows Wi-Fi ↔ mobile data changes (reads the current network for every lookup) | `UpstreamDns.resolve()` |
 | Explains the VPN before Android's permission popup (required by Google Play) | First time the switch is turned on |
-| Diagnostics line ("Lookups answered: N · failed: M", "DNS via: …") for bug reports | **Home** screen while protected |
-| Safety switch: turns itself off and explains why if lookups keep failing for 20 s | `PrivacyVpnService.giveUp()` |
+| Diagnostics (lookups answered/failed, DNS route, network, last problem) and a **Copy details** button for bug reports | **Home** screen |
+| Safety switch: turns itself off and explains why if lookups keep failing for 30 s on the same network | `PrivacyVpnService.giveUp()` |
 
 Minimum Android version: 8.0 (API 26). Target: API 36.
 
@@ -64,7 +64,7 @@ Before an app loads anything from the internet, it asks a DNS server for the add
    ▼                               │                                    ▼
  Reply "does not exist" (NXDOMAIN)  │        Forward the lookup unchanged to the
  → the ad or tracker never loads    │        real network's DNS (Android's resolver;
- → shown on the Blocked screen      │        1.1.1.1 as a last resort) and pass the
+ → shown on the Blocked screen      │        public DNS as a last resort) and pass the
                                     │        real answer back
 ```
 
@@ -150,6 +150,7 @@ The emulator needs about 6–12 GB free disk space. If your system drive is full
 | `PacketUtilsTest` | Reading the domain from IPv4/UDP DNS packets, ignoring non-DNS traffic, NXDOMAIN replies keep the id and question, answer packets swap addresses and ports with a valid IPv4 checksum |
 | `BlocklistTest` | Parsing the hosts file format (comments, `0.0.0.0 0.0.0.0`, tabs, inline comments) and parent-domain matching |
 | `BlockedLogTest` | Repeated blocks within a minute share one row; later ones get a new row |
+| `FirstSuccessTest` | The DNS route race: fast route wins, a failed route starts the next at once, a slow route is overtaken, all-fail and timeout return quickly |
 
 ### Manual test on a device or emulator
 
@@ -182,7 +183,15 @@ Results from the Android 17 emulator run on Oct 10, 2026:
 | v1.1 | ~200 ms (Android resolver for the real network) | Load normally |
 | No VPN (reference) | ~420 ms | Load normally |
 
-With *all* of the network's DNS servers dead, v1.1 falls back to 1.1.1.1 and keeps answering.
+With *all* of the network's DNS servers dead, the app falls back to public DNS and keeps answering.
+
+**Network switching (v1.2).** A tester's Xiaomi phone stopped resolving after switching mobile data → Wi-Fi in v1.1 (could not be reproduced on the emulator). v1.2 reads the current network for every lookup, races several routes, and restarts the safety-switch clock on every network change. Emulator results for v1.2:
+
+| Test | Result |
+| --- | --- |
+| Wi-Fi → mobile data → Wi-Fi with a lookup every 3–5 s | 39 answered, 0 failed |
+| 4 rapid Wi-Fi off/on flips | 46 answered, 0 failed; protection stayed on |
+| Dead first DNS server | ~0.6 s per lookup (v1.0: 8 s), 0 failed |
 
 Still to test on real phones: 30 minutes with the screen off, another VPN app taking over, and a full day of normal use. See the testing checklist in the project plan.
 
@@ -224,7 +233,7 @@ A good reading order for new developers:
 2. **`PrivacyVpnService.startTunnel()`**: loads the blocklist, reads the real DNS server, then builds the tunnel with `VpnService.Builder`. Note `addRoute("10.111.222.2", 32)`: that single route is what makes the tunnel DNS-only.
 3. **`PrivacyVpnService.runLoop()`**: the tunnel file descriptor is non-blocking, so the loop waits with `Os.poll` and a 1-second timeout instead of spinning. The timeout also lets it notice a stop request.
 4. **`handlePacket()`**: `PacketUtils.parseDnsQuery` → `Blocklist.isBlocked` → either `DnsUtils.nxdomain` (blocked) or `UpstreamDns.resolve()` in its own coroutine (allowed) → `PacketUtils.buildResponse` → write back to the tunnel.
-5. **`UpstreamDns.kt`**: how allowed lookups are answered. On Android 10+ it uses `DnsResolver.rawQuery` on the real network, which is the same resolver the phone uses with the VPN off; it already knows which servers work and handles IPv6 and Private DNS. Otherwise it tries each of the network's servers with a 1.5 s timeout (IPv4 first), then 1.1.1.1. Answers must be fast: apps give up on a lookup long before 5 s.
+5. **`UpstreamDns.kt`** + **`FirstSuccess.kt`**: how allowed lookups are answered, as a staggered race. First Android's own resolver for the real network (`DnsResolver.rawQuery`, Android 10+; it already knows which servers work and handles IPv6 and Private DNS). After 0.6 s, the network's DNS servers directly, over that network. After 1.2 s, the public fallbacks 1.1.1.1 and 8.8.8.8. If one route fails, the next starts at once; the first answer wins. The network is read fresh for every lookup. Answers must be fast: apps give up on a lookup within a few seconds.
 6. **`PacketUtils.buildResponse()`**: builds a fresh IPv4 + UDP packet with the addresses and ports swapped. The UDP checksum is 0, which IPv4 allows.
 7. **`Blocklist.kt`**: a `HashSet` lookup that walks up parent domains. Updates download to a temp file first and only replace the list if it has more than 10,000 domains, so a broken download never wipes the list.
 

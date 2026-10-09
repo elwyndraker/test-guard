@@ -1,10 +1,13 @@
 package com.diu.privacyguard.vpn
 
+import android.net.ConnectivityManager
 import android.net.DnsResolver
 import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.CancellationSignal
 import androidx.annotation.RequiresApi
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
@@ -12,49 +15,97 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.SocketTimeoutException
 import kotlin.coroutines.resume
 
 /**
- * Sends allowed lookups to the real network's DNS.
+ * Sends allowed lookups to the real network's DNS, as a staggered race (see [firstSuccess]):
  *
- * On Android 10+ the lookup goes through Android's own resolver for the real network
- * (DnsResolver.rawQuery). Android already knows which of the network's DNS servers work,
- * handles IPv6 and Private DNS, and retries; this is exactly how the phone resolves names
- * with the VPN off. On older versions, or if that fails, each of the network's servers is
- * tried with a short timeout (IPv4 first), then Cloudflare 1.1.1.1 as a last resort.
+ * 1. Android's own resolver for the real network (DnsResolver.rawQuery, Android 10+). It knows
+ *    which of the network's servers work and handles IPv6 and Private DNS, exactly as the phone
+ *    does with the VPN off.
+ * 2. After 0.6 s, the network's DNS servers directly, over that network.
+ * 3. After 1.2 s, public fallbacks (Cloudflare 1.1.1.1, Google 8.8.8.8).
  *
- * Answers must arrive within a few seconds: Chrome and other apps give up on a lookup
- * much sooner than the system resolver does, and a late answer is as bad as none.
+ * If a route fails, the later ones start at once. The network is read fresh for every lookup,
+ * so a Wi-Fi/mobile data switch can't leave us asking a network that is gone.
+ *
+ * Answers must be fast: apps give up on a lookup within a few seconds.
  */
-class UpstreamDns(private val protect: (DatagramSocket) -> Boolean) {
-
+class UpstreamDns(
+    private val connectivity: ConnectivityManager,
+    private val scope: CoroutineScope,
+    private val protect: (DatagramSocket) -> Boolean,
+) {
     companion object {
-        private const val SYSTEM_TIMEOUT_MS = 3_000L
-        private const val SERVER_TIMEOUT_MS = 1_500
-        val FALLBACK: InetAddress = InetAddress.getByAddress(byteArrayOf(1, 1, 1, 1))
+        private const val SERVERS_AFTER_MS = 600L
+        private const val FALLBACK_AFTER_MS = 1_200L
+        private const val TOTAL_TIMEOUT_MS = 4_000L
+        private const val SYSTEM_TIMEOUT_MS = 3_500L
+        private const val SOCKET_TIMEOUT_MS = 2_000
+        private val FALLBACKS = listOf(
+            InetAddress.getByAddress(byteArrayOf(1, 1, 1, 1)),
+            InetAddress.getByAddress(byteArrayOf(8, 8, 8, 8)),
+        )
     }
 
-    /** The real Wi-Fi or mobile network, or null while there is none. */
+    /** Last network the callback reported; used only if Android reports no active network. */
     @Volatile
-    var network: Network? = null
+    var lastKnownNetwork: Network? = null
 
-    /** That network's DNS servers, IPv4 first. */
+    /** The most recent failure on any route, for the diagnostics line. */
     @Volatile
-    var servers: List<InetAddress> = emptyList()
-        set(value) {
-            field = value.sortedBy { if (it is Inet4Address) 0 else 1 }
-        }
+    var lastError: String = ""
+        private set
 
-    /** Returns the answer and how it was obtained, or null if every route failed. */
-    suspend fun resolve(query: ByteArray): Pair<ByteArray, String>? {
-        val net = network
-        if (Build.VERSION.SDK_INT >= 29 && net != null) {
-            systemResolve(net, query)?.let { return withId(it, query) to "Android resolver" }
+    /** Returns the answer and the route that produced it, or null if every route failed. */
+    suspend fun resolve(query: ByteArray): Outcome<ByteArray>? {
+        val network = connectivity.activeNetwork ?: lastKnownNetwork
+        val servers = network?.let { connectivity.getLinkProperties(it)?.dnsServers }.orEmpty()
+            .sortedBy { if (it is Inet4Address) 0 else 1 }
+
+        val attempts = buildList {
+            if (Build.VERSION.SDK_INT >= 29 && network != null) {
+                add(Attempt(0, "Android resolver") { systemResolve(network, query) })
+            }
+            for (server in servers) {
+                val start = if (isEmpty()) 0 else SERVERS_AFTER_MS
+                add(Attempt(start, server.hostAddress.orEmpty()) { send(server, query, network) })
+            }
+            for (server in FALLBACKS) {
+                val start = if (isEmpty()) 0 else FALLBACK_AFTER_MS
+                add(Attempt(start, "${server.hostAddress} (fallback)") { send(server, query, null) })
+            }
         }
-        for (server in servers) {
-            send(server, query)?.let { return withId(it, query) to server.hostAddress.orEmpty() }
+        val outcome = firstSuccess(scope, attempts, TOTAL_TIMEOUT_MS)
+        if (outcome == null && lastError.isEmpty()) lastError = "no route answered within 4 s"
+        return outcome?.let { Outcome(withId(it.value, query), it.label) }
+    }
+
+    /** "Wi-Fi", "Mobile data" or "none", for diagnostics. */
+    fun networkType(): String {
+        val network = connectivity.activeNetwork ?: return "none"
+        val caps = connectivity.getNetworkCapabilities(network) ?: return "unknown"
+        return when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Mobile data"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+            else -> "other"
         }
-        return send(FALLBACK, query)?.let { withId(it, query) to "1.1.1.1 (fallback)" }
+    }
+
+    /** DNS servers and Private DNS state of the current network, for diagnostics. */
+    fun networkDnsSummary(): String {
+        val network = connectivity.activeNetwork ?: return "no network"
+        val lp = connectivity.getLinkProperties(network) ?: return "no link info"
+        val servers = lp.dnsServers.joinToString { it.hostAddress.orEmpty() }.ifEmpty { "none" }
+        val privateDns = when {
+            Build.VERSION.SDK_INT < 28 -> "n/a"
+            lp.privateDnsServerName != null -> "on (${lp.privateDnsServerName})"
+            lp.isPrivateDnsActive -> "automatic, active"
+            else -> "off or not in use"
+        }
+        return "servers: $servers; Private DNS: $privateDns"
     }
 
     // getInstance() is deprecated from Android 17 in favor of a new constructor, but it is the
@@ -75,29 +126,41 @@ class UpstreamDns(private val protect: (DatagramSocket) -> Boolean) {
                             }
 
                             override fun onError(error: DnsResolver.DnsException) {
+                                lastError = "Android resolver: error ${error.code} ${error.cause?.message.orEmpty()}".trim()
                                 if (continuation.isActive) continuation.resume(null)
                             }
                         },
                     )
                 } catch (e: Exception) {
+                    lastError = "Android resolver: ${e.javaClass.simpleName} ${e.message.orEmpty()}".trim()
                     if (continuation.isActive) continuation.resume(null)
                 }
             }
+        } ?: run {
+            if (lastError.isEmpty()) lastError = "Android resolver: no answer in 3.5 s"
+            null
         }
 
-    private fun send(server: InetAddress, query: ByteArray): ByteArray? = try {
+    /** Plain UDP lookup. [network] pins the socket to that network; null uses the default. */
+    private fun send(server: InetAddress, query: ByteArray, network: Network?): ByteArray? = try {
         DatagramSocket().use { socket ->
             protect(socket)
-            socket.soTimeout = SERVER_TIMEOUT_MS
+            network?.bindSocket(socket)
+            socket.soTimeout = SOCKET_TIMEOUT_MS
             socket.send(DatagramPacket(query, query.size, server, 53))
             val buffer = ByteArray(4096)
             val reply = DatagramPacket(buffer, buffer.size)
             socket.receive(reply)
             buffer.copyOf(reply.length)
         }
+    } catch (e: SocketTimeoutException) {
+        lastError = "${server.hostAddress}: no answer in 2 s"
+        null
     } catch (e: IOException) {
+        lastError = "${server.hostAddress}: ${e.message.orEmpty()}"
         null
     } catch (e: SecurityException) {
+        lastError = "${server.hostAddress}: not allowed (${e.message.orEmpty()})"
         null
     }
 

@@ -52,9 +52,10 @@ class PrivacyVpnService : VpnService() {
         private const val FAKE_DNS = "10.111.222.2"
         private const val STOPPED_NOTIFICATION_ID = 2
 
-        // Safety switch: if every lookup fails for this long while a network is connected,
-        // turn protection off so the phone's internet keeps working.
-        private const val GIVE_UP_AFTER_MS = 20_000L
+        // Safety switch: if every lookup fails for this long on the same network, turn
+        // protection off so the phone's internet keeps working. A network change restarts the
+        // clock, so a normal Wi-Fi/mobile data switch never trips it.
+        private const val GIVE_UP_AFTER_MS = 30_000L
         private const val GIVE_UP_MIN_FAILURES = 10
     }
 
@@ -72,7 +73,8 @@ class PrivacyVpnService : VpnService() {
     private var generation = 0
     private var callbackRegistered = false
 
-    private val upstream = UpstreamDns(::protect)
+    private val connectivity by lazy { getSystemService(ConnectivityManager::class.java) }
+    private val upstream by lazy { UpstreamDns(connectivity, scope, ::protect) }
     private val consecutiveFailures = AtomicInteger(0)
 
     @Volatile
@@ -82,16 +84,33 @@ class PrivacyVpnService : VpnService() {
     // default network is always the real one, never our tunnel.
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
-            upstream.network = network
+            if (network != upstream.lastKnownNetwork) resetFailures()
+            upstream.lastKnownNetwork = network
+            publishNetwork()
         }
 
         override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
-            upstream.network = network
-            upstream.servers = linkProperties.dnsServers
+            upstream.lastKnownNetwork = network
+            publishNetwork()
         }
 
         override fun onLost(network: Network) {
-            if (upstream.network == network) upstream.network = null
+            if (upstream.lastKnownNetwork == network) upstream.lastKnownNetwork = null
+            resetFailures()
+            publishNetwork()
+        }
+    }
+
+    private fun resetFailures() {
+        consecutiveFailures.set(0)
+        failingSince = 0L
+    }
+
+    private fun publishNetwork() {
+        try {
+            VpnController.setNetwork(upstream.networkType(), upstream.networkDnsSummary())
+        } catch (e: Exception) {
+            // Diagnostics only; never let them break the VPN.
         }
     }
 
@@ -155,13 +174,10 @@ class PrivacyVpnService : VpnService() {
             // Load the list here too: Android can start this service without the app's screen.
             Blocklist.load(applicationContext)
 
-            val connectivity = getSystemService(ConnectivityManager::class.java)
-            val realNetwork = connectivity.activeNetwork
-            upstream.network = realNetwork
-            upstream.servers = connectivity.getLinkProperties(realNetwork)?.dnsServers.orEmpty()
+            upstream.lastKnownNetwork = connectivity.activeNetwork
             VpnController.resetStats()
-            consecutiveFailures.set(0)
-            failingSince = 0L
+            publishNetwork()
+            resetFailures()
 
             val fd = try {
                 Builder()
@@ -195,7 +211,8 @@ class PrivacyVpnService : VpnService() {
                 connectivity.registerDefaultNetworkCallback(networkCallback)
                 callbackRegistered = true
                 thread(name = "PrivacyGuard-tunnel") { runLoop(newTunnel) }
-                Log.i(TAG, "Tunnel open, network DNS ${upstream.servers}, ${Blocklist.size.value} domains")
+                Log.i(TAG, "Tunnel open on ${upstream.networkType()}, ${upstream.networkDnsSummary()}, " +
+                    "${Blocklist.size.value} domains")
             }
         }
     }
@@ -248,14 +265,12 @@ class PrivacyVpnService : VpnService() {
             scope.launch {
                 val result = upstream.resolve(query.dns)
                 if (result != null) {
-                    val (answer, route) = result
-                    write(output, PacketUtils.buildResponse(packet, query.ipHeaderLength, answer))
-                    VpnController.recordAnswer(route)
-                    consecutiveFailures.set(0)
-                    failingSince = 0L
+                    write(output, PacketUtils.buildResponse(packet, query.ipHeaderLength, result.value))
+                    VpnController.recordAnswer(result.label)
+                    resetFailures()
                 } else {
-                    Log.w(TAG, "No DNS answer for ${query.domain}")
-                    VpnController.recordFailure()
+                    Log.w(TAG, "No DNS answer for ${query.domain}: ${upstream.lastError}")
+                    VpnController.recordFailure(upstream.lastError)
                     onLookupFailed()
                 }
             }
@@ -266,7 +281,7 @@ class PrivacyVpnService : VpnService() {
         val now = System.currentTimeMillis()
         if (consecutiveFailures.incrementAndGet() == 1) failingSince = now
         val since = failingSince
-        val hasNetwork = upstream.network != null
+        val hasNetwork = connectivity.activeNetwork != null
         if (hasNetwork && consecutiveFailures.get() >= GIVE_UP_MIN_FAILURES &&
             since != 0L && now - since >= GIVE_UP_AFTER_MS
         ) {
@@ -278,7 +293,8 @@ class PrivacyVpnService : VpnService() {
     private fun giveUp() {
         if (tunnel == null) return
         Log.e(TAG, "Lookups failing for ${GIVE_UP_AFTER_MS / 1000}s, turning protection off")
-        val reason = getString(R.string.stopped_dns_failing)
+        val reason = getString(R.string.stopped_dns_failing) +
+            "\n\n" + getString(R.string.last_problem, upstream.lastError.ifEmpty { "unknown" })
         VpnController.setStopReason(reason)
         shutdown()
         val openApp = PendingIntent.getActivity(
