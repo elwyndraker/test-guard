@@ -55,6 +55,7 @@ fun FiltersScreen() {
     var showAbout by remember { mutableStateOf(false) }
 
     val doneText = stringResource(R.string.update_done)
+    val partialText = stringResource(R.string.update_done_partial)
     val failedText = stringResource(R.string.update_failed)
 
     if (showAbout) {
@@ -117,8 +118,9 @@ fun FiltersScreen() {
                 message = null
                 scope.launch {
                     message = try {
-                        Blocklist.update(context)
-                        doneText
+                        val failed = Blocklist.update(context)
+                        if (failed == 0) doneText
+                        else partialText.format(failed, Blocklist.SOURCES.size)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {

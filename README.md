@@ -26,17 +26,18 @@ Screenshots are from an Android 17 emulator after browsing cnn.com with protecti
 - [Code walkthrough](#code-walkthrough)
 - [Known limits](#known-limits)
 - [Publishing on Google Play](#publishing-on-google-play)
+- [Blocklist sources](#blocklist-sources)
 - [Credits](#credits)
 
 ## Features
 
 | Feature | Where |
 | --- | --- |
-| Blocks ~72,000 ad and tracker domains in every app and browser | Runs in the background as a local VPN |
+| Blocks about 1 million ad and tracker domains, merged from [18 public lists](#blocklist-sources), in every app and browser | Runs in the background as a local VPN |
 | One switch to turn protection on and off, plus a "blocked today" counter | **Home** screen |
 | Live list of blocked domains, newest first; repeats are grouped ("Blocked 4 times") | **Blocked** screen |
-| Blocklist update on demand, and automatically when older than 7 days | **Filters** screen |
-| Works offline on first launch (a copy of the list ships inside the app) | `app/src/main/assets/hosts.txt` |
+| Blocklist update on demand, automatically when older than 7 days, and right after an app update that changes the sources | **Filters** screen |
+| Works offline on first launch (a copy of the StevenBlack list ships inside the app; the full merged list downloads on first launch) | `app/src/main/assets/hosts.txt` |
 | Follows Wi-Fi ↔ mobile data changes (reads the current network for every lookup) | `UpstreamDns.resolve()` |
 | Explains the VPN before Android's permission popup (required by Google Play) | First time the switch is turned on |
 | Diagnostics (lookups answered/failed, DNS route, network, last problem) and a **Copy details** button for bug reports | **Home** screen |
@@ -148,7 +149,8 @@ The emulator needs about 6–12 GB free disk space. If your system drive is full
 | Test class | What it checks |
 | --- | --- |
 | `PacketUtilsTest` | Reading the domain from IPv4/UDP DNS packets, ignoring non-DNS traffic, NXDOMAIN replies keep the id and question, answer packets swap addresses and ports with a valid IPv4 checksum |
-| `BlocklistTest` | Parsing the hosts file format (comments, `0.0.0.0 0.0.0.0`, tabs, inline comments) and parent-domain matching |
+| `BlocklistTest` | Parsing every list format (hosts files with `0.0.0.0`/`127.0.0.1`/`::`, plain domains, `*.` wildcards, adblock `||domain^` rules; comments, localhost and other adblock rules skipped) and parent-domain matching |
+| `DomainSetTest` | The packed domain set: no duplicates, growth to 50,000 entries, case-insensitive suffix lookups, saving one domain per line |
 | `BlockedLogTest` | Repeated blocks within a minute share one row; later ones get a new row |
 | `FirstSuccessTest` | The DNS route race: fast route wins, a failed route starts the next at once, a slow route is overtaken, all-fail and timeout return quickly |
 
@@ -200,12 +202,13 @@ Still to test on real phones: 30 minutes with the screen off, another VPN app ta
 ```
 app/src/main/
 ├── AndroidManifest.xml          permissions + the VPN service declaration
-├── assets/hosts.txt             built-in copy of the StevenBlack blocklist
+├── assets/hosts.txt             built-in copy of the StevenBlack blocklist (offline fallback)
 ├── java/com/diu/privacyguard/
 │   ├── MainActivity.kt          entry point, sets up Compose
 │   ├── BuildConfigInfo.kt       reads the app version for the About dialog
 │   ├── data/
-│   │   ├── Blocklist.kt         loads, parses, updates and checks the domain list
+│   │   ├── Blocklist.kt         the list sources; loads, parses, merges, updates and checks domains
+│   │   ├── DomainSet.kt         memory-saving set of ~1 million domains (packed bytes + hash table)
 │   │   ├── BlockedLog.kt        in-memory list of blocked domains + today's count
 │   │   └── Settings.kt          DataStore: last update time, explanation accepted
 │   ├── vpn/
@@ -235,7 +238,7 @@ A good reading order for new developers:
 4. **`handlePacket()`**: `PacketUtils.parseDnsQuery` → `Blocklist.isBlocked` → either `DnsUtils.nxdomain` (blocked) or `UpstreamDns.resolve()` in its own coroutine (allowed) → `PacketUtils.buildResponse` → write back to the tunnel.
 5. **`UpstreamDns.kt`** + **`FirstSuccess.kt`**: how allowed lookups are answered, as a staggered race. First Android's own resolver for the real network (`DnsResolver.rawQuery`, Android 10+; it already knows which servers work and handles IPv6 and Private DNS). After 0.6 s, the network's DNS servers directly, over that network. After 1.2 s, the public fallbacks 1.1.1.1 and 8.8.8.8. If one route fails, the next starts at once; the first answer wins. The network is read fresh for every lookup. Answers must be fast: apps give up on a lookup within a few seconds.
 6. **`PacketUtils.buildResponse()`**: builds a fresh IPv4 + UDP packet with the addresses and ports swapped. The UDP checksum is 0, which IPv4 allows.
-7. **`Blocklist.kt`**: a `HashSet` lookup that walks up parent domains. Updates download to a temp file first and only replace the list if it has more than 10,000 domains, so a broken download never wipes the list.
+7. **`Blocklist.kt`** + **`DomainSet.kt`**: a hash lookup that walks up parent domains. An update downloads every source in `Blocklist.SOURCES` and merges them, skipping sources that fail (the Filters screen says how many). The merged list is saved as one domain per line and only replaces the current list if it has more than 10,000 domains, so a broken download never wipes the list. About a million domains would need well over 100 MB as a `HashSet<String>`, so `DomainSet` packs them into one byte array plus an int hash table (~35 MB); the manifest also sets `largeHeap` because an update builds the new list while the old one is still in use.
 
 Things that look odd but are deliberate:
 
@@ -261,7 +264,34 @@ Before the first upload:
 
 Play Console answers (data safety, VpnService declaration, store listing) are in the project plan document.
 
+## Blocklist sources
+
+The app downloads and merges these lists (see `Blocklist.SOURCES`). Each list keeps its own license; the app only downloads them on the phone and doesn't redistribute them, except the StevenBlack copy in `assets/` (MIT).
+
+| List | Format |
+| --- | --- |
+| [jdlingyu/ad-wars](https://github.com/jdlingyu/ad-wars) | hosts |
+| [r-a-y/mobile-hosts](https://github.com/r-a-y/mobile-hosts) (AdguardMobileSpyware) | hosts |
+| [FadeMind/hosts.extras](https://github.com/FadeMind/hosts.extras) (add.2o7Net) | hosts |
+| [privacy-protection-tools/anti-AD](https://github.com/privacy-protection-tools/anti-AD) | domains |
+| [AdroitAdorKhan/antipopads-re](https://github.com/AdroitAdorKhan/antipopads-re) | domains |
+| [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists) (Pro, wildcard) | wildcard |
+| [EasyPrivacy](https://easylist.to/) | adblock (domain rules only) |
+| [hBlock](https://hblock.molinero.dev/) | domains |
+| [rentianyu/Ad-set-hosts](https://github.com/rentianyu/Ad-set-hosts) | hosts |
+| [TG-Twilight/AWAvenue-Ads-Rule](https://github.com/TG-Twilight/AWAvenue-Ads-Rule) | adblock (domain rules only) |
+| [jerryn70/GoodbyeAds](https://github.com/jerryn70/GoodbyeAds) | hosts |
+| [lightswitch05/hosts](https://www.github.developerdan.com/hosts/) (ads and tracking extended) | hosts |
+| [StevenBlack/hosts](https://github.com/StevenBlack/hosts) | hosts |
+| [NoTrack trackers](https://gitlab.com/quidsup/notrack-blocklists) | domains |
+| [notracking/hosts-blocklists](https://github.com/notracking/hosts-blocklists) | hosts |
+| [FLOSSBOXIN hosts](https://hosts.flossboxin.org.in/) | hosts |
+| [bongochong/CombinedPrivacyBlockLists](https://github.com/bongochong/CombinedPrivacyBlockLists) | wildcard |
+| [IndianList](https://easylist.to/) | adblock (domain rules only) |
+
+Adblock lists also contain rules for paths, element hiding and exceptions (`@@`); DNS filtering can't apply those, so only plain `||domain^` rules are used. Some of these lists are aggressive: if an app or site breaks, check the **Blocked** screen to see which domain was blocked.
+
 ## Credits
 
-- Blocklist: [StevenBlack/hosts](https://github.com/StevenBlack/hosts), MIT license.
+- Blocklists: see [Blocklist sources](#blocklist-sources).
 - Design ideas from [DNS66](https://github.com/julian-klode/dns66) (GPL-3.0; no code copied).

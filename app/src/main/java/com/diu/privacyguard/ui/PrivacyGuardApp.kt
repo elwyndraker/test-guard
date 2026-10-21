@@ -41,9 +41,11 @@ fun PrivacyGuardApp() {
 
     LaunchedEffect(Unit) {
         Blocklist.load(context)
-        // Automatic weekly update. Failure is fine: the current list keeps working.
+        // Automatic weekly update, and right away when the list of sources has changed
+        // (e.g. after an app update). Failure is fine: the current list keeps working.
         val lastUpdated = Settings.lastUpdated(context).first()
-        if (System.currentTimeMillis() - lastUpdated > WEEK_MS) {
+        val sourcesChanged = Settings.sourcesHash(context).first() != Blocklist.SOURCES.hashCode()
+        if (sourcesChanged || System.currentTimeMillis() - lastUpdated > WEEK_MS) {
             try {
                 Blocklist.update(context)
             } catch (e: CancellationException) {
