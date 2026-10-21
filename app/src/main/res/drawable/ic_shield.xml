@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Used for the notification and the Home tab. White so the notification can tint it. -->
+<!-- Used for the notification and the Home tab: the launcher icon's shield with the keyhole cut out.
+     White so the notification and the Home screen can tint it. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M12,1L3,5v6c0,5.55 3.84,10.74 9,12 5.16,-1.26 9,-6.45 9,-12V5l-9,-4z" />
+    <group
+        android:scaleX="0.4"
+        android:scaleY="0.4"
+        android:translateX="-9.6"
+        android:translateY="-9.8">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M54,26 C62.5,30.5 70.5,32.8 79,33.4 L79,52.5 C79,66.5 69,77.5 54,83 C39,77.5 29,66.5 29,52.5 L29,33.4 C37.5,32.8 45.5,30.5 54,26 Z M50.26,55.5 A7.5,7.5 0 1,1 57.74,55.5 L59.6,66.4 Q59.8,68 58.2,68 L49.8,68 Q48.2,68 48.4,66.4 Z" />
+    </group>
 </vector>

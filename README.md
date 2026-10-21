@@ -303,7 +303,7 @@ app/src/main/
 │       ├── BlockedScreen.kt     blocked domains list
 │       ├── FiltersScreen.kt     list size, Update now, About, links
 │       └── theme/Theme.kt       colors
-└── res/                         strings, icons, theme
+└── res/                         strings, icons (launcher icon in drawable/ic_launcher_*.xml), theme
 app/src/test/                    unit tests
 docs/index.html                  privacy policy page (for GitHub Pages)
 screenshots/                     images used in this README
@@ -344,6 +344,8 @@ Before the first upload:
 3. Raise `versionCode` in `app/build.gradle.kts` before every upload.
 
 Play Console answers (data safety, VpnService declaration, store listing) are in the project plan document.
+
+**App icon for the store listing:** upload [`play-store/icon-512.png`](play-store/icon-512.png) (512 × 512 PNG; Play rounds the corners itself). The icon on the phone is drawn from vectors in `app/src/main/res/drawable/ic_launcher_*.xml` (adaptive icon with a themed version for Android 13+); [`play-store/icon-preview.png`](play-store/icon-preview.png) shows it in different launcher shapes.
 
 ### In-app updates
 
