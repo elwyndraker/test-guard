@@ -8,7 +8,7 @@ An Android app that blocks ad and tracker domains on the whole phone, using a lo
   <img src="screenshots/filters.png" width="200" alt="Filters screen">
 </p>
 
-Screenshots are from an Android 17 emulator after browsing cnn.com with protection on.
+Screenshots are from version 1.2 on an Android 17 emulator after browsing cnn.com with protection on. Version 1.3 shows about 1 million domains on the Filters screen and links to the [blocklist sources](#blocklist-sources) instead of StevenBlack.
 
 ## Download
 
