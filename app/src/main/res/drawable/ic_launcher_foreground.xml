@@ -1,35 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launcher icon: two-tone shield with a keyhole, inside the 66dp safe zone of a 108dp adaptive icon. -->
+<!-- Launcher icon: faceted green shield with a keyhole and an orbit ring, inside the 66dp safe zone
+     of a 108dp adaptive icon. The ring's back half is drawn before the shield, its front half after. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Soft shadow under the shield -->
-    <group android:translateY="2.2">
-        <path
-            android:fillColor="#59002F27"
-            android:pathData="M54,26 C62.5,30.5 70.5,32.8 79,33.4 L79,52.5 C79,66.5 69,77.5 54,83 C39,77.5 29,66.5 29,52.5 L29,33.4 C37.5,32.8 45.5,30.5 54,26 Z" />
-    </group>
+    <path
+        android:pathData="M22.95,74.74 A32,8 -14 0,1 85.05,59.26"
+        android:strokeColor="#731DE9B6"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.4" />
+    <!-- Shield facets, lightest at the top right -->
+    <path
+        android:fillColor="#FF3EF0C2"
+        android:pathData="M54,26 C62.5,30.5 70.5,32.8 79,33.4 L79,52.5 L54,57 Z" />
+    <path
+        android:fillColor="#FF1DC9A0"
+        android:pathData="M54,26 C45.5,30.5 37.5,32.8 29,33.4 L29,52.5 L54,57 Z" />
+    <path
+        android:fillColor="#FF00A884"
+        android:pathData="M79,52.5 C79,66.5 69,77.5 54,83 L54,57 Z" />
+    <path
+        android:fillColor="#FF00796B"
+        android:pathData="M29,52.5 C29,66.5 39,77.5 54,83 L54,57 Z" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M54,26 C62.5,30.5 70.5,32.8 79,33.4 L79,52.5 C79,66.5 69,77.5 54,83 C39,77.5 29,66.5 29,52.5 L29,33.4 C37.5,32.8 45.5,30.5 54,26 Z" />
-    <!-- Right half slightly tinted, for depth -->
+        android:pathData="M50.45,51.76 A7.2,7.2 0 1,1 57.55,51.76 L59.00,59.40 Q59.2,61 57.60,61 L50.40,61 Q48.8,61 49.00,59.40 Z" />
     <path
-        android:fillColor="#FFD7EFEA"
-        android:pathData="M54,26 C62.5,30.5 70.5,32.8 79,33.4 L79,52.5 C79,66.5 69,77.5 54,83 Z" />
-    <!-- Inner rim -->
-    <group
-        android:pivotX="54"
-        android:pivotY="54.5"
-        android:scaleX="0.84"
-        android:scaleY="0.84">
-        <path
-            android:strokeColor="#3800695C"
-            android:strokeWidth="1.3"
-            android:pathData="M54,26 C62.5,30.5 70.5,32.8 79,33.4 L79,52.5 C79,66.5 69,77.5 54,83 C39,77.5 29,66.5 29,52.5 L29,33.4 C37.5,32.8 45.5,30.5 54,26 Z" />
-    </group>
+        android:pathData="M85.05,59.26 A32,8 -14 0,1 22.95,74.74"
+        android:strokeColor="#FFA7FFEB"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.4" />
+    <!-- Satellite on the ring, and a glint on the shield -->
     <path
-        android:fillColor="#FF00695C"
-        android:pathData="M50.26,55.5 A7.5,7.5 0 1,1 57.74,55.5 L59.6,66.4 Q59.8,68 58.2,68 L49.8,68 Q48.2,68 48.4,66.4 Z" />
+        android:fillColor="#FF06231F"
+        android:pathData="M33.01,77.88a3.4,3.4 0,1 0,6.8 0a3.4,3.4 0,1 0,-6.8 0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34.01,77.88a2.4,2.4 0,1 0,4.8 0a2.4,2.4 0,1 0,-4.8 0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M70,34 L71,38 L75,39 L71,40 L70,44 L69,40 L65,39 L69,38 Z" />
 </vector>
