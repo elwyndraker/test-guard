@@ -8,7 +8,7 @@ import org.junit.Test
 class BlocklistTest {
 
     private val sample = """
-        # Title: StevenBlack/hosts
+        # Title: example hosts file
         127.0.0.1 localhost
         0.0.0.0 0.0.0.0
         0.0.0.0 doubleclick.net

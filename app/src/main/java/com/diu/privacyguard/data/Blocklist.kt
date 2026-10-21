@@ -33,7 +33,6 @@ object Blocklist {
         "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/AWAvenue-Ads-Rule.txt",
         "https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Hosts/GoodbyeAds.txt",
         "https://www.github.developerdan.com/hosts/lists/ads-and-tracking-extended.txt",
-        "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
         "https://gitlab.com/quidsup/notrack-blocklists/-/raw/master/trackers.list",
         "https://raw.githubusercontent.com/notracking/hosts-blocklists/master/hostnames.txt",
         "https://hosts.flossboxin.org.in/files/hosts",

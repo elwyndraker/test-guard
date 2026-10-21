@@ -33,11 +33,11 @@ Screenshots are from an Android 17 emulator after browsing cnn.com with protecti
 
 | Feature | Where |
 | --- | --- |
-| Blocks about 1 million ad and tracker domains, merged from [18 public lists](#blocklist-sources), in every app and browser | Runs in the background as a local VPN |
+| Blocks about 1 million ad and tracker domains, merged from [17 public lists](#blocklist-sources), in every app and browser | Runs in the background as a local VPN |
 | One switch to turn protection on and off, plus a "blocked today" counter | **Home** screen |
 | Live list of blocked domains, newest first; repeats are grouped ("Blocked 4 times") | **Blocked** screen |
 | Blocklist update on demand, automatically when older than 7 days, and right after an app update that changes the sources | **Filters** screen |
-| Works offline on first launch (a copy of the StevenBlack list ships inside the app; the full merged list downloads on first launch) | `app/src/main/assets/hosts.txt` |
+| Works offline on first launch (a copy of the anti-AD list ships inside the app; the full merged list downloads on first launch) | `app/src/main/assets/hosts.txt` |
 | Follows Wi-Fi ↔ mobile data changes (reads the current network for every lookup) | `UpstreamDns.resolve()` |
 | Explains the VPN before Android's permission popup (required by Google Play) | First time the switch is turned on |
 | Diagnostics (lookups answered/failed, DNS route, network, last problem) and a **Copy details** button for bug reports | **Home** screen |
@@ -202,7 +202,7 @@ Still to test on real phones: 30 minutes with the screen off, another VPN app ta
 ```
 app/src/main/
 ├── AndroidManifest.xml          permissions + the VPN service declaration
-├── assets/hosts.txt             built-in copy of the StevenBlack blocklist (offline fallback)
+├── assets/hosts.txt             built-in copy of the anti-AD list (offline fallback)
 ├── java/com/diu/privacyguard/
 │   ├── MainActivity.kt          entry point, sets up Compose
 │   ├── BuildConfigInfo.kt       reads the app version for the About dialog
@@ -266,7 +266,7 @@ Play Console answers (data safety, VpnService declaration, store listing) are in
 
 ## Blocklist sources
 
-The app downloads and merges these lists (see `Blocklist.SOURCES`). Each list keeps its own license; the app only downloads them on the phone and doesn't redistribute them, except the StevenBlack copy in `assets/` (MIT).
+The app downloads and merges these lists (see `Blocklist.SOURCES`). Each list keeps its own license; the app only downloads them on the phone and doesn't redistribute them, except the anti-AD copy in `assets/` (MIT License, Copyright (c) 2017-2019 gently).
 
 | List | Format |
 | --- | --- |
@@ -282,7 +282,6 @@ The app downloads and merges these lists (see `Blocklist.SOURCES`). Each list ke
 | [TG-Twilight/AWAvenue-Ads-Rule](https://github.com/TG-Twilight/AWAvenue-Ads-Rule) | adblock (domain rules only) |
 | [jerryn70/GoodbyeAds](https://github.com/jerryn70/GoodbyeAds) | hosts |
 | [lightswitch05/hosts](https://www.github.developerdan.com/hosts/) (ads and tracking extended) | hosts |
-| [StevenBlack/hosts](https://github.com/StevenBlack/hosts) | hosts |
 | [NoTrack trackers](https://gitlab.com/quidsup/notrack-blocklists) | domains |
 | [notracking/hosts-blocklists](https://github.com/notracking/hosts-blocklists) | hosts |
 | [FLOSSBOXIN hosts](https://hosts.flossboxin.org.in/) | hosts |
