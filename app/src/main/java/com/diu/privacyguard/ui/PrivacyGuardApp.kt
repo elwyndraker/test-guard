@@ -3,6 +3,7 @@ package com.diu.privacyguard.ui
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -70,11 +71,14 @@ fun PrivacyGuardApp() {
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when (Tab.entries[selected]) {
-                Tab.Home -> HomeScreen()
-                Tab.Blocked -> BlockedScreen()
-                Tab.Filters -> FiltersScreen()
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            AppUpdateBanner()
+            Box(Modifier.weight(1f)) {
+                when (Tab.entries[selected]) {
+                    Tab.Home -> HomeScreen()
+                    Tab.Blocked -> BlockedScreen()
+                    Tab.Filters -> FiltersScreen()
+                }
             }
         }
     }

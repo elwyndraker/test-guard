@@ -264,6 +264,19 @@ Before the first upload:
 
 Play Console answers (data safety, VpnService declaration, store listing) are in the project plan document.
 
+### In-app updates
+
+`AppUpdateBanner.kt` uses Google Play's [in-app updates](https://developer.android.com/guide/playcore/in-app-updates) (flexible flow). When Play has a newer version, a card at the top of every screen offers **Update**; Play shows its own update screen and downloads in the background, then the card offers **Restart** to install. The app never downloads or installs APKs itself, which Play policy forbids.
+
+The card only appears for copies installed from Google Play. Until the app is on Play, and for APKs installed from GitHub releases, it simply never shows. To try it before the public release:
+
+1. Upload a build (for example version 1.3, code 4) to the **Internal testing** track and add yourself as a tester.
+2. Install it on a phone from the tester link in the Play Store.
+3. Upload a build with a higher `versionCode` to the same track.
+4. Open the Play Store page once (so Play notices the new version), then open PrivacyGuard: the update card appears.
+
+Google's [internal app sharing](https://support.google.com/googleplay/android-developer/answer/9844679) also works for this and doesn't need a review.
+
 ## Blocklist sources
 
 The app downloads and merges these lists (see `Blocklist.SOURCES`). Each list keeps its own license; the app only downloads them on the phone and doesn't redistribute them, except the anti-AD copy in `assets/` (MIT License, Copyright (c) 2017-2019 gently).
