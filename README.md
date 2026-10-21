@@ -20,7 +20,7 @@ Screenshots are from an Android 17 emulator after browsing cnn.com with protecti
 - [How it works](#how-it-works)
 - [Install the app without Android Studio](#install-the-app-without-android-studio)
 - [Build from source](#build-from-source)
-- [Run it on an emulator](#run-it-on-an-emulator)
+- [Run it on a phone or an emulator](#run-it-on-a-phone-or-an-emulator)
 - [Testing](#testing)
 - [Project structure](#project-structure)
 - [Code walkthrough](#code-walkthrough)
@@ -89,54 +89,102 @@ On some phones (Xiaomi, Oppo, Vivo, Realme, Huawei), the system may also show a 
 
 ## Build from source
 
+These steps are for Linux (Ubuntu, Fedora and similar). Windows works too: use `gradlew.bat` instead of `./gradlew` and Windows paths such as `C:/Users/<you>/...`.
+
 Requirements:
 
 - [Android Studio](https://developer.android.com/studio) 2026.2 or newer (it includes the right JDK and Android SDK).
-- About 3 GB free disk space for Gradle and the SDK.
+- About 3 GB free disk space for Gradle and the SDK, plus 6–12 GB for an emulator.
+- `git`.
+
+### Install Android Studio on Linux
+
+Either of these:
+
+```bash
+# Ubuntu and other distros with snap
+sudo snap install android-studio --classic
+
+# Or download the .tar.gz from developer.android.com/studio, then:
+tar -xzf android-studio-*-linux.tar.gz -C ~/
+~/android-studio/bin/studio.sh
+```
+
+On first start, the setup wizard downloads the Android SDK to `~/Android/Sdk`. Accept the defaults.
+
+Then get the code:
+
+```bash
+git clone https://github.com/elwyndraker/test-guard.git
+cd test-guard
+```
 
 ### With Android Studio
 
-1. **File → Open** and choose this folder. Wait for the Gradle sync to finish.
+1. **File → Open** and choose the `test-guard` folder. Wait for the Gradle sync to finish.
 2. Press **Run ▶** to install on a connected phone or an emulator.
 3. To get an APK file: **Build → Build App Bundle(s) / APK(s) → Build APK(s)**. The file appears at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ### From the command line
 
 ```bash
-# Windows: gradlew.bat instead of ./gradlew
 ./gradlew assembleDebug          # builds app/build/outputs/apk/debug/app-debug.apk
 ./gradlew testDebugUnitTest      # runs the unit tests
 ./gradlew lintDebug              # runs Android Lint
 ```
 
-### Release builds and signing
-
-`./gradlew assembleRelease` (APK) and `./gradlew bundleRelease` (AAB for Google Play) sign the app when a `keystore.properties` file exists in the project root:
+If Gradle can't find the Android SDK, create `local.properties` in the project folder (Android Studio does this for you when you open the project):
 
 ```properties
-storeFile=D:/PrivacyGuard-signing/privacyguard-upload.jks
+sdk.dir=/home/<you>/Android/Sdk
+```
+
+If `./gradlew` says "Permission denied", run `chmod +x gradlew` once.
+
+### Release builds and signing
+
+`./gradlew assembleRelease` (APK) and `./gradlew bundleRelease` (AAB for Google Play) sign the app when a `keystore.properties` file exists in the project folder:
+
+```properties
+storeFile=/home/<you>/PrivacyGuard-signing/privacyguard-upload.jks
 storePassword=...
 keyAlias=privacyguard
 keyPassword=...
 ```
 
-The file and the key are excluded by `.gitignore` and must never be committed. Without the file, release builds are produced unsigned. Every published release must be signed with the same key, otherwise phones refuse to install it over the previous version.
+The key file and `keystore.properties` are excluded by `.gitignore` and must never be committed. Without `keystore.properties`, release builds are produced unsigned. Every published release must be signed with the same key, otherwise phones refuse to install it over the previous version.
 
-If Gradle can't find the Android SDK, create `local.properties` with your SDK path (Android Studio does this for you):
+To create a new key (keep it outside the project folder):
 
-```properties
-sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
+```bash
+mkdir -p ~/PrivacyGuard-signing && cd ~/PrivacyGuard-signing
+keytool -genkeypair -v -keystore privacyguard-upload.jks -alias privacyguard \
+  -keyalg RSA -keysize 2048 -validity 10000
 ```
+
+`keytool` comes with Java; if the command isn't found, use the copy inside Android Studio (`~/android-studio/jbr/bin/keytool`, or `/snap/android-studio/current/jbr/bin/keytool` for the snap).
+
+**Back up the `.jks` file and its passwords in at least two places** (for example a password manager and a USB stick). If the key is lost, phones can't update the app from a newer APK, and users have to uninstall and reinstall.
 
 Versions used: Android Gradle Plugin 9.4.1, Gradle 9.7.1, Kotlin 2.4.21, Compose BOM 2026.09.00, compileSdk 37. All are in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
 
-## Run it on an emulator
+## Run it on a phone or an emulator
 
-1. In Android Studio, open **Device Manager** (phone icon on the right) → **Create device** → pick a phone → pick a system image (API 26 or newer) → **Finish**.
-2. Select the emulator in the toolbar and press **Run ▶**.
-3. In the app, turn the switch on and accept Android's "Connection request" popup.
+### Emulator
 
-The emulator needs about 6–12 GB free disk space. If your system drive is full, set the environment variable `ANDROID_AVD_HOME` to a folder on another drive (for example `D:\Android\avd`) before creating the device.
+1. On Linux, the emulator needs KVM. Check with `ls -l /dev/kvm`; if you get "permission denied" when starting the emulator, run `sudo usermod -aG kvm $USER` and log out and back in.
+2. In Android Studio, open **Device Manager** (phone icon on the right) → **Create device** → pick a phone → pick a system image (API 26 or newer) → **Finish**.
+3. Select the emulator in the toolbar and press **Run ▶**.
+4. In the app, turn the switch on and accept Android's "Connection request" popup.
+
+The emulator needs about 6–12 GB free disk space. To keep it on another disk, set the environment variable `ANDROID_AVD_HOME` (for example `export ANDROID_AVD_HOME=/mnt/data/avd` in `~/.profile`) before creating the device.
+
+### Real phone over USB
+
+1. On the phone: **Settings → About phone**, tap **Build number** 7 times, then turn on **Developer options → USB debugging**.
+2. Connect the cable and accept the "Allow USB debugging?" popup on the phone.
+3. Check with `~/Android/Sdk/platform-tools/adb devices`. If the phone shows as "no permissions" on Ubuntu/Debian, run `sudo apt install android-sdk-platform-tools-common` (it adds the USB rules), then unplug and replug.
+4. Select the phone in Android Studio's toolbar and press **Run ▶**.
 
 ## Testing
 
