@@ -166,6 +166,39 @@ keytool -genkeypair -v -keystore privacyguard-upload.jks -alias privacyguard \
 
 **Back up the `.jks` file and its passwords in at least two places** (for example a password manager and a USB stick). If the key is lost, phones can't update the app from a newer APK, and users have to uninstall and reinstall.
 
+### Automatic releases
+
+`.github/workflows/release.yml` builds the signed APK and AAB on GitHub and publishes them as a release whenever you push a version tag. You don't need your own computer for releases once the key is set up.
+
+**One-time setup: store the signing key as GitHub secrets.**
+
+1. Turn the key file into text:
+   ```bash
+   base64 -w0 ~/PrivacyGuard-signing/privacyguard-upload.jks > key.txt
+   ```
+2. On GitHub: repository → **Settings → Secrets and variables → Actions → New repository secret**. Add four secrets:
+
+   | Name | Value |
+   | --- | --- |
+   | `KEYSTORE_BASE64` | the whole content of `key.txt` |
+   | `KEYSTORE_PASSWORD` | the keystore password |
+   | `KEY_ALIAS` | `privacyguard` |
+   | `KEY_PASSWORD` | the key password |
+
+3. Delete `key.txt` (`rm key.txt`). Keep your own backup of the `.jks` file: GitHub secrets can't be read back, only replaced.
+
+**Each release:**
+
+1. Raise `versionCode` by 1 and set `versionName` in `app/build.gradle.kts` (for example `1.4`), commit and push.
+2. Tag that commit with the same version and push the tag:
+   ```bash
+   git tag v1.4
+   git push origin v1.4
+   ```
+3. After a few minutes the release appears under **Releases** with `PrivacyGuard-v1.4.apk` (for phones) and `PrivacyGuard-v1.4.aab` (for Google Play). Edit the release afterwards to write your own notes.
+
+You can also draft the release on GitHub first with your notes and a new tag; when you publish it, the workflow adds the files to it. The workflow stops without publishing if the tag doesn't match `versionName`, if a unit test fails, or if the secrets are missing.
+
 Versions used: Android Gradle Plugin 9.4.1, Gradle 9.7.1, Kotlin 2.4.21, Compose BOM 2026.09.00, compileSdk 37. All are in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
 
 ## Run it on a phone or an emulator
